@@ -105,6 +105,22 @@ public:
    * the action happens!
    */
   void update(void);
+    
+  /**
+   * Alternative main layer loop when used in combination with interrupts.
+   *
+   * This function must be called when an interrupt is triggered and data
+   * is received. It behaves exactly as update(), but it will not loop through
+   * all pipes, but only the specified one. This way, you can keep your interrupt
+   * routine short.
+   *
+   * (To be honest, pipe_num is only used to print debug information. It is not 
+   * used for any other purposes.)
+   *
+   * @warning Only use it in combination with interrupts!
+   * @see RF24::whatHappened()
+   */
+  void update(uint8_t pipe_num);
 
   /**
    * Test whether there is a message available for this node
