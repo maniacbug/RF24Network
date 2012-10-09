@@ -50,53 +50,60 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
 
 /******************************************************************/
 
+void RF24Network::update(uint8_t pipe_num)
+{
+  // Dump the payloads until we've gotten everything
+  boolean done = false;
+  while (!done)
+  {
+    // Fetch the payload, and see if this was the last one.
+    done = radio.read( frame_buffer, sizeof(frame_buffer) );
+
+    // Read the beginning of the frame as the header
+    const RF24NetworkHeader& header = * reinterpret_cast<RF24NetworkHeader*>(frame_buffer);
+
+    IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Received on %u %s\n\r"),millis(),pipe_num,header.toString()));
+    IF_SERIAL_DEBUG(const uint16_t* i = reinterpret_cast<const uint16_t*>(frame_buffer + sizeof(RF24NetworkHeader));printf_P(PSTR("%lu: NET message %04x\n\r"),millis(),*i));
+
+    // Throw it away if it's not a valid address
+    if ( !is_valid_address(header.to_node) )
+      continue;
+
+    // Is this for us?
+    if ( header.to_node == node_address )
+      // Add it to the buffer of frames for us
+      enqueue();
+    else
+      // Relay it
+      write(header.to_node);
+
+    // NOT NEEDED anymore.  Now all reading pipes are open to start.
+#if 0
+    // If this was for us, from one of our children, but on our listening
+    // pipe, it could mean that we are not listening to them.  If so, open up
+    // and listen to their talking pipe
+
+    if ( header.to_node == node_address && pipe_num == 0 && is_descendant(header.from_node) )
+    {
+      uint8_t pipe = pipe_to_descendant(header.from_node);
+      radio.openReadingPipe(pipe,pipe_address(node_address,pipe));
+
+      // Also need to open pipe 1 so the system can get the full 5-byte address of the pipe.
+      radio.openReadingPipe(1,pipe_address(node_address,1));
+    }
+#endif
+  }
+}
+
+/******************************************************************/
+
 void RF24Network::update(void)
 {
   // if there is data ready
   uint8_t pipe_num;
   while ( radio.available(&pipe_num) )
   {
-    // Dump the payloads until we've gotten everything
-    boolean done = false;
-    while (!done)
-    {
-      // Fetch the payload, and see if this was the last one.
-      done = radio.read( frame_buffer, sizeof(frame_buffer) );
-
-      // Read the beginning of the frame as the header
-      const RF24NetworkHeader& header = * reinterpret_cast<RF24NetworkHeader*>(frame_buffer);
-
-      IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Received on %u %s\n\r"),millis(),pipe_num,header.toString()));
-      IF_SERIAL_DEBUG(const uint16_t* i = reinterpret_cast<const uint16_t*>(frame_buffer + sizeof(RF24NetworkHeader));printf_P(PSTR("%lu: NET message %04x\n\r"),millis(),*i));
-
-      // Throw it away if it's not a valid address
-      if ( !is_valid_address(header.to_node) )
-	continue;
-
-      // Is this for us?
-      if ( header.to_node == node_address )
-	// Add it to the buffer of frames for us
-	enqueue();
-      else
-	// Relay it
-	write(header.to_node);
-
-      // NOT NEEDED anymore.  Now all reading pipes are open to start.
-#if 0
-      // If this was for us, from one of our children, but on our listening
-      // pipe, it could mean that we are not listening to them.  If so, open up
-      // and listen to their talking pipe
-
-      if ( header.to_node == node_address && pipe_num == 0 && is_descendant(header.from_node) )
-      {
-	uint8_t pipe = pipe_to_descendant(header.from_node);
-	radio.openReadingPipe(pipe,pipe_address(node_address,pipe));
-
-	// Also need to open pipe 1 so the system can get the full 5-byte address of the pipe.
-	radio.openReadingPipe(1,pipe_address(node_address,1));
-      }
-#endif
-    }
+    update(pipe_num);
   }
 }
 
