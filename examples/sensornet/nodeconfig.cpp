@@ -34,10 +34,10 @@ const eeprom_info_t& nodeconfig_read(void)
   else
   {
     printf_P(PSTR("*** No valid address found.  Send node address via serial of the form 011<cr>\n\r"));
-//    while(1)
-//    {
+    while(1)
+    {
       nodeconfig_listen();
-//    }
+    }
   }
   
   return eeprom_info;
