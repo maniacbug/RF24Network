@@ -34,10 +34,10 @@ const eeprom_info_t& nodeconfig_read(void)
   else
   {
     printf_P(PSTR("*** No valid address found.  Send node address via serial of the form 011<cr>\n\r"));
-    while(1)
-    {
+//    while(1)
+//    {
       nodeconfig_listen();
-    }
+//    }
   }
   
   return eeprom_info;
@@ -71,7 +71,7 @@ void nodeconfig_listen(void)
       eeprom_info.relay = true;
       printf_P(PSTR("ROLE: %S\n\r"),eeprom_info.relay ? PSTR("Relay") : PSTR("Leaf") );
       if ( eeprom_info.flag == valid_eeprom_flag )
-	eeprom_update_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
+	eeprom_write_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
       else
 	printf_P(PSTR("Please assign an address to commit this role to EEPROM\r\n"));
     }
@@ -80,7 +80,7 @@ void nodeconfig_listen(void)
       eeprom_info.relay = false;
       printf_P(PSTR("ROLE: %S\n\r"),eeprom_info.relay ? PSTR("Relay") : PSTR("Leaf") );
       if ( eeprom_info.flag == valid_eeprom_flag )
-	eeprom_update_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
+	eeprom_write_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
       else
 	printf_P(PSTR("Please assign an address to commit this role to EEPROM\r\n"));
     }
@@ -98,7 +98,7 @@ void nodeconfig_listen(void)
       // It is our address
       eeprom_info.flag = valid_eeprom_flag;
       eeprom_info.address = address;
-      eeprom_update_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
+      eeprom_write_block(&eeprom_info,address_at_eeprom_location,sizeof(eeprom_info));
 
       // And we are done right now (no easy way to soft reset)
       printf_P(PSTR("\n\rManually set to address 0%o\n\rPress RESET to continue!"),address);
