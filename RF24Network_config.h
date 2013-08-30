@@ -32,6 +32,7 @@ extern HardwareSPI SPI;
 #define IF_SERIAL_DEBUG(x) ({x;})
 #else
 #define IF_SERIAL_DEBUG(x)
+#define printf_P(...)
 #endif
 
 // Avoid spurious warnings
