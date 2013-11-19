@@ -10,10 +10,12 @@
 #ifndef __RF24_CONFIG_H__
 #define __RF24_CONFIG_H__
 
+#ifdef ARDUINO
 #if ARDUINO < 100
 #include <WProgram.h>
 #else
 #include <Arduino.h>
+#endif
 #endif
 
 #include <stddef.h>
@@ -23,7 +25,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-extern HardwareSPI SPI;
 #define _BV(x) (1<<(x))
 #endif
 
@@ -54,10 +55,12 @@ typedef char const prog_char;
 typedef uint16_t prog_uint16_t;
 #define PSTR(x) (x)
 #define printf_P printf
+#define snprintf_P snprintf
 #define strlen_P strlen
 #define PROGMEM
 #define pgm_read_word(p) (*(p)) 
 #define PRIPSTR "%s"
+#define min(a,b) (a<b?a:b)
 #endif
 
 #endif // __RF24_CONFIG_H__

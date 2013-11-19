@@ -57,7 +57,7 @@ void RF24Network::update(void)
   while ( radio.available(&pipe_num) )
   {
     // Dump the payloads until we've gotten everything
-    boolean done = false;
+    bool done = false;
     while (!done)
     {
       // Fetch the payload, and see if this was the last one.
