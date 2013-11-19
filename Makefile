@@ -24,12 +24,12 @@ LIBNAME=$(LIB).so.1.0
 CPPFLAGS=-I$(PREFIX)/include -I.
 
 # The recommended compiler flags for the Raspberry Pi
-CCFLAGS=-Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
+CXXFLAGS=-Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
 
-all: librf24-bcm
+all: $(LIB)
 
 # Make the library
-librf24-bcm: RF24Network.o Sync.o 
+$(LIB): RF24Network.o Sync.o 
 	g++ -shared -Wl,-soname,$@.so.1 ${CCFLAGS} -o ${LIBNAME} $^
 	
 clean:
