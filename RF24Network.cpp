@@ -30,6 +30,9 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
 
   node_address = _node_address;
 
+  if ( ! radio.isValid() )
+    return;
+
   // Set up the radio the way we want it to look
   radio.setChannel(_channel);
   radio.setDataRate(RF24_1MBPS);
@@ -54,7 +57,7 @@ void RF24Network::update(void)
 {
   // if there is data ready
   uint8_t pipe_num;
-  while ( radio.available(&pipe_num) )
+  while ( radio.isValid() && radio.available(&pipe_num) )
   {
     // Dump the payloads until we've gotten everything
     bool done = false;
@@ -165,14 +168,18 @@ size_t RF24Network::read(RF24NetworkHeader& header,void* message, size_t maxlen)
     // Move the pointer back one in the queue 
     next_frame -= frame_size;
     uint8_t* frame = next_frame;
-      
-    // How much buffer size should we actually copy?
-    bufsize = min(maxlen,frame_size-sizeof(RF24NetworkHeader));
-
-    // Copy the next available frame from the queue into the provided buffer
+     
     memcpy(&header,frame,sizeof(RF24NetworkHeader));
-    memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
-    
+   
+    if (maxlen > 0)
+    {
+      // How much buffer size should we actually copy?
+      bufsize = min(maxlen,frame_size-sizeof(RF24NetworkHeader));
+
+      // Copy the next available frame from the queue into the provided buffer
+      memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
+    }
+
     IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Received %s\n\r"),millis(),header.toString()));
   }
 
@@ -249,7 +256,12 @@ bool RF24Network::write(uint16_t to_node)
   radio.stopListening();
 
   // Put the frame on the pipe
-  ok = write_to_pipe( send_node, send_pipe );
+  int retries = 3;
+  do
+  {
+    ok = write_to_pipe( send_node, send_pipe );
+  }
+  while (!ok && retries--);
 
       // NOT NEEDED anymore.  Now all reading pipes are open to start.
 #if 0

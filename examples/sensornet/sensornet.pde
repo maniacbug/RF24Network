@@ -73,15 +73,30 @@ RF24Network network(radio);
 // Our node configuration 
 eeprom_info_t this_node;
 
+// System configuration
+struct K_message_t
+{
+  uint8_t revision; /* Which rev of the current system config? */
+  uint8_t sleep_cycles; /* How many 8s sleep cycles to wait between transmissions */
+};
+
+K_message_t system_config = { 0, 0 };
+
+uint8_t has_recent_system_config = false;
+
+// Number of packets we've failed to send since we last sent one
+// successfully
+uint16_t lost_packets = 0;
+
 // Sleep constants.  In this example, the watchdog timer wakes up
 // every 4s, and every single wakeup we power up the radio and send
 // a reading.  In real use, these numbers which be much higher.
 // Try wdt_8s and 7 cycles for one reading per minute.> 1
 const wdt_prescalar_e wdt_prescalar = wdt_8s;
-const int sleep_cycles_per_transmission = 1;
+uint8_t sleep_cycles_per_transmission = 4;
 
 // Non-sleeping nodes need a timer to regulate their sending interval
-Timer send_timer(8000);
+Timer send_timer(8000UL * (uint32_t)sleep_cycles_per_transmission);
 
 // Button controls functionality of the unit
 Button ButtonA(button_a);
@@ -123,6 +138,9 @@ public:
 /**
  * Startup LED sequence.  Lights up the LEDs in sequence first, then dims 
  * them in the same sequence.
+ *
+ * Note that startup sequence should last long enough to get a 'K' response back
+ * from the parent!
  */
 
 class StartupLEDs: public Timer
@@ -149,7 +167,7 @@ protected:
     }
   }
 public:
-  StartupLEDs(const LED** _leds, int _num): Timer(250), leds(_leds), current(_leds), end(_leds+_num), state(true)
+  StartupLEDs(const LED** _leds, int _num): Timer(333), leds(_leds), current(_leds), end(_leds+_num), state(true)
   {
   }
 };
@@ -206,6 +224,8 @@ CalibrationLEDs calibration_leds(leds,num_leds);
 
 // Nodes in test mode do not sleep, but instead constantly try to send
 bool test_mode = false;
+bool user_test_mode = false;  // test mode initiated by user
+bool system_test_mode = false; // test mode initiated by system
 
 // Nodes in calibration mode are looking for temperature calibration
 bool calibration_mode = false;
@@ -295,7 +315,7 @@ void setup(void)
   // Prepare sleep parameters
   //
 
-  // Only the leaves sleep.  Nodes 01-05 are presumed to be relay nodes. 
+  // Only the leaves sleep. 
   if ( ! this_node.relay )
     Sleep.begin(wdt_prescalar,sleep_cycles_per_transmission);
 
@@ -324,6 +344,15 @@ void setup(void)
   SPI.begin();
   radio.begin();
   network.begin(/*channel*/ 92, /*node address*/ this_node.address);
+
+  //
+  // Request configuration from parent
+  //
+
+  RF24NetworkHeader header(network.parent(),'k');
+  printf_P(PSTR("%lu: APP Sending type-%c to 0%o...\n\r"),millis(),header.type,header.to_node);
+  if ( ! network.write(header,NULL,0) )
+    printf_P(PSTR("Failed.\r\n"));
 }
 
 void loop(void)
@@ -339,23 +368,52 @@ void loop(void)
   {
     // If so, grab it and print it out
     RF24NetworkHeader header;
-    S_message message;
-    network.read(header,&message,sizeof(message));
-    printf_P(PSTR("%lu: APP Received #%u type %c %s from 0%o\n\r"),millis(),header.id,header.type,message.toString(),header.from_node);
+    network.peek(header);
+    printf_P(PSTR("%lu: APP Received #%u type %c from 0%o\n\r"),millis(),header.id,header.type,header.from_node);
 
-    // If we get a message, that's a little odd, because this sketch doesn't run on the
-    // base node.  Possibly it's a test message from a child node.  Possibly it's a sensor
-    // calibration message from a parent node.
-    //
-    // Either way, it only matters if we're NOT sleeping, and also only useful it we have
-    // a temp sensor
+    // Child node is just testing
+    if ( header.type == 't' )
+    {
+      // clear message from queue
+      network.read(header,NULL,0);
+    }
+    // Handle config messages
+    else if ( header.type == 'k' )
+    {
+      // child is requesting a configuration from us
+      network.read(header,NULL,0);
+      RF24NetworkHeader response_header(/*to node*/ header.from_node, /*type*/ 'K');
+      network.write(response_header,&system_config,sizeof(system_config));
+      printf_P(PSTR("%lu: APP Sending new config #%i: %i to 0%o\n\r"),millis(),system_config.revision,system_config.sleep_cycles,header.from_node);
+    }
+    else if ( header.type == 'K' )
+    {
+      has_recent_system_config = true;
+      // parent has sent a configuration to us
+      K_message_t message;
+      network.read(header,&message,sizeof(message));
+      if ( message.revision > system_config.revision )
+      {
+	memcpy(&system_config,&message,sizeof(system_config));
+	printf_P(PSTR("%lu: APP Accepted new config #%i: %i\n\r"),millis(),system_config.revision,system_config.sleep_cycles);
+
+	// Act on the new configuration!!
+	sleep_cycles_per_transmission = system_config.sleep_cycles; 
+	send_timer.setInterval(8000UL * (uint32_t)sleep_cycles_per_transmission);
+	Sleep.setSleepCycles(sleep_cycles_per_transmission);
+      }
+    }
 
     // If we have a temp sensor AND we are not sleeping
     if ( temp_pin > -1 && ( ! Sleep || test_mode ) )
     {
-      // if the received message is a test message, we can respond with a 'C' message in return
+      // if the received message is a calibration request 'c' message, we can respond
+      // with a callibration response 'C' message in return
       if ( header.type == 'c' )
       {
+	// clear message from queue
+	network.read(header,NULL,0);
+	
 	// Take a reading
 	S_message response;
 	response.temp_reading = measure_temp(); 
@@ -364,28 +422,66 @@ void loop(void)
 	// Send it back as a calibration message
 	RF24NetworkHeader response_header(/*to node*/ header.from_node, /*type*/ 'C');
 	network.write(response_header,&response,sizeof(response));
+	printf_P(PSTR("%lu: APP Sending calibration to 0%o\n\r"),millis(),header.from_node);
       }
       else if ( header.type == 'C' )
       {
-	// This is a calibration message.  Calculate the diff
-	uint16_t diff = message.temp_reading - measure_temp();
-	printf_P(PSTR("%lu: APP Calibration received %04x diff %04x\n\r"),millis(),message.temp_reading,diff);
-	calibration_data.add(diff);
-
-	if ( calibration_data.done() )
+	S_message message;
+	network.read(header,&message,sizeof(message));
+	
+	// This is a calibration response message
+	if ( calibration_mode )
 	{
-	  calibration_mode = false;
-	  calibration_leds.disable();
-	  printf_P(PSTR("%lu: APP Stop calibration mode. Calibrate by %04x\n\r"),millis(),calibration_data.result());
+	  // Calculate the diff
+	  uint16_t diff = message.temp_reading - measure_temp();
+	  printf_P(PSTR("%lu: APP Calibration received %04x diff %04x\n\r"),millis(),message.temp_reading,diff);
+	  calibration_data.add(diff);
 
-	  // Now apply the calibration
-	  this_node.temp_calibration += calibration_data.result();
-	  // And save it to eeprom...
-	  set_temp_calibration( this_node.temp_calibration );
+	  if ( calibration_data.done() )
+	  {
+	    calibration_mode = false;
+	    calibration_leds.disable();
+	    printf_P(PSTR("%lu: APP Stop calibration mode. Calibrate by %04x\n\r"),millis(),calibration_data.result());
+
+	    // Now apply the calibration
+	    this_node.temp_calibration += calibration_data.result();
+	    // And save it to eeprom...
+	    set_temp_calibration( this_node.temp_calibration );
+	  }
 	}
 
       }
     }
+  }
+
+  // Handle the quest for a system config response message ('K').  If we haven't gotten one by the
+  // time the startup LED's finish, we'll go into test mode for a while looking for one.
+  if ( !has_recent_system_config && millis() < 10000 )
+  {
+    if ( ! system_test_mode )
+      printf_P(PSTR("%lu: APP Start system config mode\n\r"),millis());
+
+    system_test_mode = true;
+  }
+  else
+  {
+    if ( system_test_mode )
+      printf_P(PSTR("%lu: APP Stop system config mode\n\r"),millis());
+    
+    system_test_mode = false;
+  }
+
+  bool old_test_mode = test_mode;
+  test_mode = system_test_mode || user_test_mode;
+
+  if ( test_mode && ! old_test_mode )
+    send_timer.setInterval(2000);
+  else if ( !test_mode && old_test_mode )
+  {
+    send_timer.setInterval(8000UL * (uint32_t)sleep_cycles_per_transmission);
+    Green = false;
+    Red = false;
+    lost_packets = 0;
   }
 
   // If we are the kind of node that sends readings, 
@@ -405,16 +501,23 @@ void loop(void)
     S_message message;
     message.temp_reading = measure_temp(); 
     message.voltage_reading = measure_voltage(); 
+    message.lost_packets = min(lost_packets,0xff);
 
     char message_type = 'S';
     if ( calibration_mode )
       message_type = 'c';
-    else if (test_mode )
-      message_type = 't';
+    else if (test_mode)
+    {
+      // If we still don't have a config, we'll use our test mode to keep asking for them
+      if ( ! has_recent_system_config )
+	message_type = 'k';
+      else
+	message_type = 't';
+    }
 
     // By default send to the base
     uint16_t to_node = 0;
-    if ( test_mode )
+    if ( test_mode ) 
       // In test mode, sent to our parent.
       to_node = network.parent();
 
@@ -427,12 +530,14 @@ void loop(void)
     {
       if ( test_mode && ! calibration_mode )
 	Green = true;
+      lost_packets = 0;
       printf_P(PSTR("%lu: APP Send ok\n\r"),millis());
     }
     else
     {
       if ( test_mode && ! calibration_mode )
 	Red = true;
+      ++lost_packets;
       printf_P(PSTR("%lu: APP Send failed\n\r"),millis());
     }
 
@@ -463,8 +568,7 @@ void loop(void)
     // Pressing it after turns off test mode.
     if ( startup_leds )
     {
-      test_mode = true;
-      send_timer.setInterval(1000);
+      user_test_mode = true;
       printf_P(PSTR("%lu: APP Start test mode\n\r"),millis());
     }
     else if ( calibration_mode )
@@ -473,18 +577,15 @@ void loop(void)
       calibration_leds.disable();
       printf_P(PSTR("%lu: APP Stop calibration mode\n\r"),millis());
     }
-    else if ( test_mode )
+    else if ( user_test_mode )
     {
-      test_mode = false;
-      Green = false;
-      Red = false;
-      send_timer.setInterval(8000);
+      user_test_mode = false;
       printf_P(PSTR("%lu: APP Stop test mode\n\r"),millis());
     }
   }
 
   // Long press
-  if ( ButtonLong.wasPressed() && test_mode )
+  if ( ButtonLong.wasPressed() && user_test_mode )
   {
     calibration_mode = true;
     calibration_leds.reset();
