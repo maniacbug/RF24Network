@@ -50,14 +50,16 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
 
 /******************************************************************/
 
-void RF24Network::update(void)
+bool RF24Network::update(void)
 {
   // if there is data ready
   uint8_t pipe_num;
-  while ( radio.available(&pipe_num) )
+  boolean has_message=false;
+  while ( radio.isValid() && radio.available(&pipe_num) )
   {
     // Dump the payloads until we've gotten everything
     boolean done = false;
+    has_message=true;
     while (!done)
     {
       // Fetch the payload, and see if this was the last one.
@@ -98,6 +100,7 @@ void RF24Network::update(void)
 #endif
     }
   }
+  return has_message;
 }
 
 /******************************************************************/
