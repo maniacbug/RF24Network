@@ -17,6 +17,8 @@
 #include "Sync.h"
 
 /****************************************************************************/
+// FIXME
+#define IF_SERIAL_DEBUG(...)
 
 void Sync::update(void)
 {
