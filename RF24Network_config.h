@@ -21,8 +21,15 @@
 #include <stddef.h>
 
 #if defined(ARDUINO)
+
+#if !defined(ENERGIA)
 // Progmem is Arduino-specific
 #include <avr/pgmspace.h>
+#else
+#define prog_char char
+#define PSTR(s) (s)
+#define __FlashStringHelper char
+#endif
 
 #else
 #include <stdint.h>
