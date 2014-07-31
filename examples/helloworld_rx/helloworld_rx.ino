@@ -15,7 +15,7 @@
 
 #include <RF24.h>
 #include <SPI.h>
-#include <RF24NetworkDebug.h>
+#include <RF24Network.h>
 
 #if defined(ENERGIA)
 #       define CE       P2_1

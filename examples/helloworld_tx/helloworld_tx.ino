@@ -13,9 +13,9 @@
  * Every 2 seconds, send a payload to the receiver node.
  */
 
-#include <RF24Network.h>
-#include <RF24.h>
 #include <SPI.h>
+#include <RF24.h>
+#include <RF24Network.h>
 
 #if defined(ENERGIA)
 #       define CE       P2_1
@@ -24,7 +24,7 @@
 #else
 #       define CE       9
 #       define CS       10
-#       define BAUD     57600
+#       define BAUD     115200
 #endif
 
 RF24 radio(CE, CS);

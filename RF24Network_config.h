@@ -20,33 +20,21 @@
 
 #include <stddef.h>
 
-// Stuff that is normally provided by Arduino
-#ifndef ARDUINO
+#if defined(ARDUINO)
+// Progmem is Arduino-specific
+#include <avr/pgmspace.h>
+
+#else
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #define _BV(x) (1<<(x))
-#endif
-
-#if defined(ENERGIA)
-#define printf_P printf
-#define PSTR(x) (x)
-#define PRIPSTR "%s"
-
-#elif defined(ARDUINO)
-// Progmem is Arduino-specific
-#include <avr/pgmspace.h>
-#define PRIPSTR "%S"
-
-#else
 typedef char const prog_char;
 typedef uint16_t prog_uint16_t;
 #define PSTR(x) (x)
-#define printf_P printf
 #define strlen_P strlen
 #define PROGMEM
 #define pgm_read_word(p) (*(p)) 
-#define PRIPSTR "%s"
 #define min(a,b) (a<b?a:b)
 #endif
 
