@@ -1,9 +1,11 @@
-#ifndef __RF24NETWORK_SERIAL_DEBUG_H
-#define __RF24NETWORK_SERIAL_DEBUG_H
+#ifndef __RF24NETWORK_DEBUG_H
+#define __RF24NETWORK_DEBUG_H
 
-class NetworkSerialDebug: public RF24NetworkDebug
+#include "RF24Network.h"
+
+class RF24NetworkDebug: public RF24Network
 {
-public:
+protected:
   void on_header(uint8_t pipe_num, const RF24NetworkHeader &header, uint8_t *frame_buffer);
 
   void on_enqueue(size_t frame, bool result);
@@ -18,7 +20,8 @@ public:
 
   void on_setup_address(uint16_t node_address, uint16_t node_mask, uint16_t parent_node, uint16_t parent_pipe);
 
-  NetworkSerialDebug(RF24Network &network) { network.setDebug(this); }
+public:
+  RF24NetworkDebug(class RF24 &radio): RF24Network(radio) {}
 };
 
 #endif

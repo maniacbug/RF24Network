@@ -19,7 +19,6 @@
 #include <stdint.h>
 
 class RF24;
-class RF24NetworkDebug;
 
 /**
  * Header which is sent with each message
@@ -66,17 +65,6 @@ struct RF24NetworkHeader
   void toString(void) const;
 };
 
-class RF24NetworkDebug
-{
-public:
-  virtual void on_header(uint8_t pipe_num, const RF24NetworkHeader &header, uint8_t *frame_buffer) {}
-  virtual void on_enqueue(size_t frame, bool result) {}
-  virtual void on_receive(const RF24NetworkHeader& header) {}
-  virtual void on_send(const RF24NetworkHeader& header, const void *message, size_t len) {}
-  virtual void on_write(uint16_t to_node, uint16_t send_node, uint8_t send_pipe) {}
-  virtual void on_setup_address(uint16_t node_address, uint16_t node_mask, uint16_t parent_node, uint16_t parent_pipe) {}
-};
-
 /**
  * Network Layer for RF24 Radios
  *
@@ -86,6 +74,15 @@ public:
 
 class RF24Network
 {
+protected:
+  // debugging: by default does nothing
+  virtual void on_header(uint8_t pipe_num, const RF24NetworkHeader &header, uint8_t *frame_buffer) {}
+  virtual void on_enqueue(size_t frame, bool result) {}
+  virtual void on_receive(const RF24NetworkHeader& header) {}
+  virtual void on_send(const RF24NetworkHeader& header, const void *message, size_t len) {}
+  virtual void on_write(uint16_t to_node, uint16_t send_node, uint8_t send_pipe) {}
+  virtual void on_setup_address(uint16_t node_address, uint16_t node_mask, uint16_t parent_node, uint16_t parent_pipe) {}
+
 public:
   /**
    * Construct the network
@@ -94,8 +91,6 @@ public:
    *
    */
   RF24Network( RF24& _radio );
-
-  void setDebug(RF24NetworkDebug *dbg) { this->dbg = dbg; }
 
   /**
    * Bring up the network
@@ -187,8 +182,6 @@ private:
   uint16_t parent_node; /**< Our parent's node address */
   uint8_t parent_pipe; /**< The pipe our parent uses to listen to us */
   uint16_t node_mask; /**< The bits which contain signfificant node address information */
-
-  RF24NetworkDebug *dbg;
 };
 
 /**

@@ -69,8 +69,7 @@ void RF24Network::update(void)
       // Read the beginning of the frame as the header
       const RF24NetworkHeader& header = * reinterpret_cast<RF24NetworkHeader*>(frame_buffer);
 
-      if (dbg)
-        dbg->on_header(pipe_num, header, frame_buffer);
+      on_header(pipe_num, header, frame_buffer);
 
       // Throw it away if it's not a valid address
       if ( !is_valid_address(header.to_node) )
@@ -116,8 +115,7 @@ bool RF24Network::enqueue(void)
     next_frame += frame_size; 
     result = true;
   }
-  if (dbg)
-    dbg->on_enqueue(next_frame - frame_queue, result);
+  on_enqueue(next_frame - frame_queue, result);
 
   return result;
 }
@@ -174,8 +172,7 @@ size_t RF24Network::read(RF24NetworkHeader& header,void* message, size_t maxlen)
       memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
     }
 
-    if (dbg)
-      dbg->on_receive(header);
+    on_receive(header);
   }
 
   return bufsize;
@@ -193,8 +190,7 @@ bool RF24Network::write(RF24NetworkHeader& header,const void* message, size_t le
   if (len)
     memcpy(frame_buffer + sizeof(RF24NetworkHeader),message,min(frame_size-sizeof(RF24NetworkHeader),len));
 
-  if (dbg)
-    dbg->on_send(header, message, len);
+  on_send(header, message, len);
 
   // If the user is trying to send it to himself
   if ( header.to_node == node_address )
@@ -241,8 +237,7 @@ bool RF24Network::write(uint16_t to_node)
     send_pipe = 0;
   }
   
-  if (dbg)
-    dbg->on_write(to_node, send_node, send_pipe);
+  on_write(to_node, send_node, send_pipe);
 
   // First, stop listening so we can talk
   radio.stopListening();
@@ -350,8 +345,7 @@ void RF24Network::setup_address(void)
   }
   parent_pipe = i;
 
-  if (dbg)
-    dbg->on_setup_address(node_address, node_mask, parent_node, parent_pipe);
+  on_setup_address(node_address, node_mask, parent_node, parent_pipe);
 }
 
 /******************************************************************/

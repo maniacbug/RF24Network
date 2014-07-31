@@ -13,15 +13,24 @@
  * Listens for messages from the transmitter and prints them out.
  */
 
-#include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
+#include <RF24NetworkDebug.h>
 
-// nRF24L01(+) radio attached using Getting Started board 
-RF24 radio(9,10);
+#if defined(ENERGIA)
+#       define CE       P2_1
+#       define CS       P2_0
+#       define BAUD     9600
+#else
+#       define CE       9
+#       define CS       10
+#       define BAUD     57600
+#endif
+
+RF24 radio(CE, CS);
 
 // Network uses that radio
-RF24Network network(radio);
+RF24NetworkDebug network(radio);
 
 // Address of our node
 const uint16_t this_node = 0;
@@ -38,7 +47,7 @@ struct payload_t
 
 void setup(void)
 {
-  Serial.begin(57600);
+  Serial.begin(BAUD);
   Serial.println("RF24Network/examples/helloworld_rx/");
  
   SPI.begin();
