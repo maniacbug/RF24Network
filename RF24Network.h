@@ -184,7 +184,7 @@ class RF24NetworkDebug: public RF24Network
 private:
   class Print &_out;
 
-  void print_timed(const prog_char *str);
+  void print_timed(const char *str);
   void print_header(const RF24NetworkHeader &h);
 
 protected:

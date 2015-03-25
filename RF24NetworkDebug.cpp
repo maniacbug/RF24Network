@@ -7,7 +7,7 @@
 #  define FLASH_PTR(x) ((const __FlashStringHelper *)x)
 #endif
 
-void RF24NetworkDebug::print_timed(const prog_char *str)
+void RF24NetworkDebug::print_timed(const char *str)
 {
   _out.print(millis());
   _out.print(F(": "));
