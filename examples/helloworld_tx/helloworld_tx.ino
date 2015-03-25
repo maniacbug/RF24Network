@@ -18,8 +18,13 @@
 #include <RF24Network.h>
 
 #if defined(ENERGIA)
-#       define CE       P2_1
-#       define CS       P2_0
+#if defined(__MSP430FR5739__)
+#	define CE	P1_2
+#	define CS	P1_3
+#elif defined(__MSP430G2553__)
+#	define CE	P2_1
+#	define CS	P2_0
+#endif
 #       define BAUD     9600
 #else
 #       define CE       9
