@@ -47,7 +47,7 @@ struct payload_t
 
 void setup(void)
 {
-  Serial.begin(57600);
+  Serial.begin(115200);
   Serial.println("RF24Network/examples/helloworld_tx/");
  
   SPI.begin();
