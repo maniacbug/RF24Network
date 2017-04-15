@@ -12,7 +12,8 @@
  * TRANSMITTER NODE
  * Every 2 seconds, send a payload to the receiver node.
  */
-
+#include <stddef.h>
+#include <avr/pgmspace.h>
 #include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
