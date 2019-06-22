@@ -35,8 +35,6 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
 
   // Set up the radio the way we want it to look
   radio.setChannel(_channel);
-  radio.setDataRate(RF24_1MBPS);
-  radio.setCRCLength(RF24_CRC_16);
 
   // Setup our address helper cache
   setup_address();
@@ -46,9 +44,6 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
   while (i--)
     radio.openReadingPipe(i,pipe_address(_node_address,i));
   radio.startListening();
-
-  // Spew debugging state about the radio
-  radio.printDetails();
 }
 
 /******************************************************************/
@@ -60,7 +55,7 @@ void RF24Network::update(void)
   while ( radio.isValid() && radio.available(&pipe_num) )
   {
     // Dump the payloads until we've gotten everything
-    boolean done = false;
+    bool done = false;
     while (!done)
     {
       // Fetch the payload, and see if this was the last one.
@@ -69,8 +64,7 @@ void RF24Network::update(void)
       // Read the beginning of the frame as the header
       const RF24NetworkHeader& header = * reinterpret_cast<RF24NetworkHeader*>(frame_buffer);
 
-      IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Received on %u %s\n\r"),millis(),pipe_num,header.toString()));
-      IF_SERIAL_DEBUG(const uint16_t* i = reinterpret_cast<const uint16_t*>(frame_buffer + sizeof(RF24NetworkHeader));printf_P(PSTR("%lu: NET message %04x\n\r"),millis(),*i));
+      on_header(pipe_num, header, frame_buffer);
 
       // Throw it away if it's not a valid address
       if ( !is_valid_address(header.to_node) )
@@ -109,21 +103,14 @@ bool RF24Network::enqueue(void)
 {
   bool result = false;
   
-  IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Enqueue @%x "),millis(),next_frame-frame_queue));
-
   // Copy the current frame into the frame queue
   if ( next_frame < frame_queue + sizeof(frame_queue) )
   {
     memcpy(next_frame,frame_buffer, frame_size );
     next_frame += frame_size; 
-
     result = true;
-    IF_SERIAL_DEBUG(printf_P(PSTR("ok\n\r")));
   }
-  else
-  {
-    IF_SERIAL_DEBUG(printf_P(PSTR("failed\n\r")));
-  }
+  on_enqueue(next_frame - frame_queue, result);
 
   return result;
 }
@@ -180,7 +167,7 @@ size_t RF24Network::read(RF24NetworkHeader& header,void* message, size_t maxlen)
       memcpy(message,frame+sizeof(RF24NetworkHeader),bufsize);
     }
 
-    IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Received %s\n\r"),millis(),header.toString()));
+    on_receive(header);
   }
 
   return bufsize;
@@ -198,12 +185,7 @@ bool RF24Network::write(RF24NetworkHeader& header,const void* message, size_t le
   if (len)
     memcpy(frame_buffer + sizeof(RF24NetworkHeader),message,min(frame_size-sizeof(RF24NetworkHeader),len));
 
-  IF_SERIAL_DEBUG(printf_P(PSTR("%lu: NET Sending %s\n\r"),millis(),header.toString()));
-  if (len)
-  {
-    IF_SERIAL_DEBUG(const uint16_t* i = reinterpret_cast<const uint16_t*>(message);printf_P(PSTR("%lu: NET message %04x\n\r"),millis(),*i));
-  }
-
+  on_send(header, message, len);
 
   // If the user is trying to send it to himself
   if ( header.to_node == node_address )
@@ -250,7 +232,7 @@ bool RF24Network::write(uint16_t to_node)
     send_pipe = 0;
   }
   
-  IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Sending to 0%o via 0%o on pipe %x\n\r"),millis(),to_node,send_node,send_pipe));
+  on_write(to_node, send_node, send_pipe);
 
   // First, stop listening so we can talk
   radio.stopListening();
@@ -298,18 +280,7 @@ bool RF24Network::write_to_pipe( uint16_t node, uint8_t pipe )
   }
   while ( !ok && --attempts );
 
-  IF_SERIAL_DEBUG(printf_P(PSTR("%lu: MAC Sent on %lx %S\n\r"),millis(),(uint32_t)out_pipe,ok?PSTR("ok"):PSTR("failed")));
-
   return ok;
-}
-
-/******************************************************************/
-
-const char* RF24NetworkHeader::toString(void) const
-{
-  static char buffer[45];
-  snprintf_P(buffer,sizeof(buffer),PSTR("id %04x from 0%o to 0%o type %c"),id,from_node,to_node,type);
-  return buffer;
 }
 
 /******************************************************************/
@@ -369,9 +340,7 @@ void RF24Network::setup_address(void)
   }
   parent_pipe = i;
 
-#ifdef SERIAL_DEBUG
-  printf_P(PSTR("setup_address node=0%o mask=0%o parent=0%o pipe=0%o\n\r"),node_address,node_mask,parent_node,parent_pipe);
-#endif
+  on_setup_address(node_address, node_mask, parent_node, parent_pipe);
 }
 
 /******************************************************************/
@@ -412,7 +381,6 @@ bool is_valid_address( uint16_t node )
     if (digit < 1 || digit > 5)
     {
       result = false;
-      printf_P(PSTR("*** WARNING *** Invalid address 0%o\n\r"),node);
       break;
     }
     node >>= 3;
@@ -443,8 +411,6 @@ uint64_t pipe_address( uint16_t node, uint8_t pipe )
 
     shift -= 4;
   }
-
-  IF_SERIAL_DEBUG(uint32_t* top = reinterpret_cast<uint32_t*>(out+1);printf_P(PSTR("%lu: NET Pipe %i on node 0%o has address %lx%x\n\r"),millis(),pipe,node,*top,*out));
 
   return result;
 }

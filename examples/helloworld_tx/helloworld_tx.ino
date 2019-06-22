@@ -13,12 +13,26 @@
  * Every 2 seconds, send a payload to the receiver node.
  */
 
-#include <RF24Network.h>
-#include <RF24.h>
 #include <SPI.h>
+#include <RF24.h>
+#include <RF24Network.h>
 
-// nRF24L01(+) radio attached using Getting Started board 
-RF24 radio(9,10);
+#if defined(ENERGIA)
+#if defined(__MSP430FR5739__)
+#	define CE	P1_2
+#	define CS	P1_3
+#elif defined(__MSP430G2553__)
+#	define CE	P2_1
+#	define CS	P2_0
+#endif
+#       define BAUD     9600
+#else
+#       define CE       9
+#       define CS       10
+#       define BAUD     115200
+#endif
+
+RF24 radio(CE, CS);
 
 // Network uses that radio
 RF24Network network(radio);
@@ -47,7 +61,7 @@ struct payload_t
 
 void setup(void)
 {
-  Serial.begin(57600);
+  Serial.begin(BAUD);
   Serial.println("RF24Network/examples/helloworld_tx/");
  
   SPI.begin();
