@@ -35,8 +35,6 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
 
   // Set up the radio the way we want it to look
   radio.setChannel(_channel);
-  radio.setDataRate(RF24_1MBPS);
-  radio.setCRCLength(RF24_CRC_16);
 
   // Setup our address helper cache
   setup_address();
@@ -46,9 +44,6 @@ void RF24Network::begin(uint8_t _channel, uint16_t _node_address )
   while (i--)
     radio.openReadingPipe(i,pipe_address(_node_address,i));
   radio.startListening();
-
-  // Spew debugging state about the radio
-  radio.printDetails();
 }
 
 /******************************************************************/
